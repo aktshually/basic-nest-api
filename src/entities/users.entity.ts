@@ -16,14 +16,20 @@ export class User {
     @Column()
     password: string;
 
-    @Column()
-    lastLogin: Date;
+    @Column({
+        default: Date.now()
+    })
+    lastLogin: number;
 
-    @CreateDateColumn()
-    createdAt: Date;
+    @CreateDateColumn({
+        default: Date.now()
+    })
+    createdAt: number;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+    @UpdateDateColumn({
+        default: Date.now()
+    })
+    updatedAt: number;
 
     constructor() {
         if (!this.user_id) {
