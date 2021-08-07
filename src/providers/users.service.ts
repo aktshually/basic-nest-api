@@ -30,7 +30,11 @@ export class UsersService {
         }, HttpStatus.FORBIDDEN);
     }
 
-    async getAll() {
+    async getAll(
+        email: string,
+        password: string
+    ) {
+        if (!this.checkIfUserDoesExist(email, password)) return this.throwInvalidEmailOrPasswordError()
         const users = await UserModel.find();
         return users.map((user) => {
             const {
@@ -91,7 +95,7 @@ export class UsersService {
         email: string,
         password: string
     ) {
-        if (!this.checkIfUserDoesExist(email, password)) return this.throwUserNotFoundError();
+        if (!this.checkIfUserDoesExist(email, password)) return this.throwInvalidEmailOrPasswordError();
         const {
             username,
             email: mail,
@@ -109,12 +113,14 @@ export class UsersService {
     }
 
     async getSpecificUser(
-        username: string
+        username: string,
+        email: string,
+        password: string
     ) {
+        if (await UserModel.findOne({email, password}) === null) return this.throwInvalidEmailOrPasswordError();
         const user = await UserModel.findOne({ username });
         if (user === null) return this.throwUserNotFoundError();
         const {
-            email,
             todo,
             lastLogin,
             lastUpdated,
@@ -144,7 +150,7 @@ export class UsersService {
             }, HttpStatus.UNAUTHORIZED);
         }
         const user = await UserModel.findOne({ email });
-        if (user === null) return this.throwUserNotFoundError();
+        if (user === null) return this.throwInvalidEmailOrPasswordError();
         if (user.password !== password) return this.throwInvalidEmailOrPasswordError();
         await UserModel.findOneAndUpdate({
             email,

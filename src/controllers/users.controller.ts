@@ -16,8 +16,11 @@ export default class UsersController {
     }
 
     @Get("/all")
-    async getAll() {
-        return await this.usersService.getAll();
+    async getAll(
+        @Body("email") email: string,
+        @Body("password") password: string
+    ) {
+        return await this.usersService.getAll(email, password);
     }
 
     @Delete()
@@ -30,9 +33,11 @@ export default class UsersController {
 
     @Get()
     async getSpecificUser(
-        @Body("username") username: string
+        @Body("username") username: string,
+        @Body("email") email: string,
+        @Body("password") password: string
     ) {
-        return await this.usersService.getSpecificUser(username);
+        return await this.usersService.getSpecificUser(username, email, password);
     }
 
     @Put()
