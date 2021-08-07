@@ -4,7 +4,7 @@ import { UsersService } from "src/providers/users.service";
 
 @Controller("users")
 export default class UsersController {
-    constructor(private readonly usersService: UsersService) {}
+    constructor(private readonly usersService: UsersService) { }
 
     @Post()
     async createUser(
@@ -12,12 +12,12 @@ export default class UsersController {
         @Body("email") email: string,
         @Body("password") password: string
     ) {
-        return await this.usersService.createUser(name, email, password)
+        return await this.usersService.createUser(name, email, password);
     }
 
     @Get("/all")
     async getAll() {
-        return await this.usersService.getAll()
+        return await this.usersService.getAll();
     }
 
     @Delete()
@@ -25,14 +25,14 @@ export default class UsersController {
         @Body("email") email: string,
         @Body("password") password: string
     ) {
-        return await this.usersService.removeUser(email, password)
+        return await this.usersService.removeUser(email, password);
     }
 
     @Get()
     async getSpecificUser(
         @Body("username") username: string
     ) {
-        return await this.usersService.getSpecificUser(username)
+        return await this.usersService.getSpecificUser(username);
     }
 
     @Put()
@@ -42,7 +42,7 @@ export default class UsersController {
         @Body("infoToUpdate") infoToUpdate: string,
         @Body("newInfo") newInfo: string
     ) {
-        return await this.usersService.updateUser(email, password, infoToUpdate, newInfo)
+        return await this.usersService.updateUser(email, password, infoToUpdate, newInfo);
     }
 
     @Patch()
@@ -50,7 +50,26 @@ export default class UsersController {
         @Body("email") email: string,
         @Body("password") password: string
     ) {
-        return await this.usersService.makeLogin(email, password)
+        return await this.usersService.makeLogin(email, password);
+    }
+
+    @Put("/todo")
+    async createItem(
+        @Body("itemName") itemName: string,
+        @Body("itemDescription") itemDescription: string,
+        @Body("email") email: string,
+        @Body("password") password: string
+    ) {
+        return await this.usersService.createTodoListItem(itemName, itemDescription, email, password);
+    }
+
+    @Delete("/todo")
+    async deleteItem(
+        @Body("itemName") itemName: string,
+        @Body("email") email: string,
+        @Body("password") password: string
+    ) {
+        return await this.usersService.deleteTodoListItem(itemName, email, password);
     }
 
 }

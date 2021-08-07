@@ -1,80 +1,133 @@
 import { HttpStatus } from "@nestjs/common";
-import { BadRequestException } from "@nestjs/common";
 import { HttpException } from "@nestjs/common";
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { User } from "src/entities/users.entity";
-import { Repository } from "typeorm";
+import UserModel from "src/database/models/UserModel";
+import { v4 as uuid } from "uuid";
 
 @Injectable()
 export class UsersService {
-    constructor(@InjectRepository(User) private UsersRepository: Repository<User>) {
 
+    private async checkIfUserDoesExist(
+        email: string,
+        password: string
+    ) {
+        const user = await UserModel.findOne({ email, password });
+        if (user === null) return true;
+        return false;
     }
 
-    private async getOneByEmailAndPassword(email: string, password: string) {
-        return await this.UsersRepository.findOneOrFail({
-            email: email,
-            password: password
-        });
+    private throwInvalidEmailOrPasswordError() {
+        throw new HttpException({
+            status: HttpStatus.UNAUTHORIZED,
+            error: "Invalid email/password"
+        }, HttpStatus.UNAUTHORIZED);
+    }
+
+    private throwUserNotFoundError() {
+        throw new HttpException({
+            status: HttpStatus.FORBIDDEN,
+            error: "User not found"
+        }, HttpStatus.FORBIDDEN);
     }
 
     async getAll() {
-        const data = (await this.UsersRepository.find()).map((info) => {
-            let {user_id, ...necessaryInfo} = info
-            return necessaryInfo
+        const users = await UserModel.find();
+        return users.map((user) => {
+            const {
+                username,
+                email,
+                todo,
+                lastUpdated,
+                lastLogin,
+                createdAt
+            } = user;
+            return {
+                username,
+                email,
+                todo,
+                lastLogin,
+                lastUpdated,
+                createdAt,
+            };
         });
-        return data
     }
 
     async createUser(
         username: string,
         email: string,
         password: string
-    ): Promise<User> {
-        const user = this.UsersRepository.create({
-            username,
-            email,
-            password
-        });
-        const possibleUser = await this.UsersRepository.find({email})
-        if (possibleUser.length !== 0) {
-            throw new HttpException({
-                status: HttpStatus.UNAUTHORIZED,
-                error: "An user with this email address already exists"
-            }, HttpStatus.UNAUTHORIZED)
+    ) {
+        if (!this.checkIfUserDoesExist(email, password)) {
+            const user = await UserModel.create({
+                username,
+                email,
+                password
+            });
+            const {
+                username: name,
+                email: mail,
+                todo: todo,
+                lastLogin: lastLogin,
+                lastUpdated: lastUpdate,
+                createdAt: createdAt,
+            } = await user.save();
+            return {
+                username: name,
+                email: mail,
+                todo: todo,
+                lastLogin: lastLogin,
+                lastUpdate: lastUpdate,
+                createdAt: createdAt
+            };
         }
-        return await this.UsersRepository.save(user);
+        throw new HttpException({
+            status: HttpStatus.FORBIDDEN,
+            error: "An user with this email address already exists"
+        }, HttpStatus.FORBIDDEN);
+
     }
 
     async removeUser(
         email: string,
         password: string
     ) {
-        try {
-            const user = await this.getOneByEmailAndPassword(email, password);
-            return await this.UsersRepository.remove(user);
-        }
-        catch (error) {
-            throw new BadRequestException("Could not remove this user");
-        }
+        if (!this.checkIfUserDoesExist(email, password)) return this.throwUserNotFoundError();
+        const {
+            username,
+            email: mail,
+            lastLogin,
+            lastUpdated,
+            createdAt
+        } = await UserModel.findOneAndRemove({ email, password });
+        return {
+            username,
+            email: mail,
+            lastLogin,
+            lastUpdated,
+            createdAt
+        };
     }
 
     async getSpecificUser(
         username: string
     ) {
-        const user = await this.UsersRepository.find({ username });
-        if (user.length === 0) {
-            throw new BadRequestException("Could not find this user");
-        }
-        const data = user[0];
+        const user = await UserModel.findOne({ username });
+        if (user === null) return this.throwUserNotFoundError();
+        const {
+            email,
+            todo,
+            lastLogin,
+            lastUpdated,
+            createdAt
+        } = user;
         return {
-            username: data.username,
-            email: data.email,
-            lastLogin: data.lastLogin,
-            createdAt: data.createdAt,
-            updatedat: data.updatedAt
-        }
+            username,
+            email,
+            todo,
+            lastLogin,
+            lastUpdated,
+            createdAt
+        };
     }
 
     async updateUser(
@@ -83,35 +136,76 @@ export class UsersService {
         infoToUpdate: string,
         newInfo: string
     ) {
-        const possibilities = ["email", "password", "username"];
-        let user = await this.UsersRepository.find({
+        const possibilities = ["password", "username", "email"];
+        if (!possibilities.includes(infoToUpdate)) {
+            throw new HttpException({
+                status: HttpStatus.UNAUTHORIZED,
+                error: "You can not change this information or it's invalid"
+            }, HttpStatus.UNAUTHORIZED);
+        }
+        const user = await UserModel.findOne({ email });
+        if (user === null) return this.throwUserNotFoundError();
+        if (user.password !== password) return this.throwInvalidEmailOrPasswordError();
+        await UserModel.findOneAndUpdate({
             email,
             password
-        });
-        if (user.length === 0) {
-            throw new BadRequestException("Could not find this user");
-        }
-        if (!possibilities.includes(infoToUpdate)) {
-            throw new BadRequestException("You can not update this info or its invalid");
-        }
-        user[0][infoToUpdate] = newInfo;
-        user[0].updatedAt = Date.now()
-        return this.UsersRepository.save(user);
+        }, { [infoToUpdate]: newInfo });
+        const {
+            username,
+            email: mail,
+            todo,
+            lastLogin,
+            lastUpdated,
+            createdAt
+        } = await UserModel.findOne({ email: infoToUpdate === "email" ? newInfo : email });
+        return {
+            username,
+            mail,
+            todo,
+            lastLogin,
+            lastUpdated,
+            createdAt
+        };
     }
 
     async makeLogin(
         email: string,
         password: string
     ) {
-        const user = await this.UsersRepository.find({
-            email,
-            password
-        })
-        if (user.length === 0) {
-            throw new BadRequestException("Incorret credentials")
-        }
+        if (!this.checkIfUserDoesExist(email, password)) return this.throwUserNotFoundError();
         return {
-            "status": "logged in successfully"
-        }
+            "status": "loggin made successfully!"
+        };
+    }
+
+    async createTodoListItem(
+        itemName: string,
+        itemDescription: string,
+        email: string,
+        password: string
+    ) {
+        const user = await UserModel.findOne({ email, password });
+        if (user === null) return this.throwInvalidEmailOrPasswordError();
+        user.todo.push({
+            itemName,
+            itemDescription,
+            itemId: uuid()
+        });
+        await UserModel.findOneAndUpdate({ email, password }, { todo: user.todo });
+        return user.todo;
+    }
+
+
+    async deleteTodoListItem(
+        itemName: string,
+        email: string,
+        password: string
+    ) {
+        const user = await UserModel.findOne({ email, password });
+        if (user === null) return this.throwInvalidEmailOrPasswordError();
+        const index = user.todo.findIndex(item => item.itemName === itemName);
+        user.todo.splice(index, 1);
+        await UserModel.findOneAndUpdate({ email, password }, { todo: user.todo });
+        return user.todo;
     }
 }
